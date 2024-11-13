@@ -1,5 +1,4 @@
 import bpy
-#hola
 
 classes = []
 
