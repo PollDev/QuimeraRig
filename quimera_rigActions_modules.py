@@ -1,6 +1,5 @@
 import bpy
 import time
-#from . import cs_defUi
  
 actionMapProp = "automatism"
 
@@ -9,8 +8,7 @@ intProps = ["slotMap"]
 boolProps = ["canUse"]
 actionProps = strProps + intProps + boolProps
 
-mapAct = {"auto": False,
-    "filter": "",
+mapAct = {"filter": "",
     "bone": "",
     "v_min": "",
     "v_max": "",
@@ -59,32 +57,6 @@ def delActionCons(actName, erase, bool):
                         if c.action.name == actName:
                             c.enabled = bool
 
-def delAllActionsCons(only, erase, bool):
-    for a in bpy.data.actions:
-        if only:
-            if a.get("canUse"):
-                delActionCons(a.name, erase, bool)
-            else:
-                delActionCons(a.name, erase, bool)
-        else:
-            delActionCons(a.name, erase, bool)
-
-def setAllActionsProps(only):
-    for a in bpy.data.actions:
-        if only:
-            if a.get("canUse"):
-                setActionsProps(a.name)
-        else:
-            setActionsProps(a.name)
-
-def setActionsFakeUser(only, bool):
-    for a in bpy.data.actions:
-        if only:
-            if a.get("canUse"):
-                a.use_fake_user = bool
-        else:
-            a.use_fake_user = bool
-
 def selectActionBones(actName):
     rig = bpy.context.active_object
     bone = rig.data.bones
@@ -96,28 +68,19 @@ def selectActionBones(actName):
         else:
             b.select = False
 
-def actionCons(actName, bool):
-    rig = bpy.context.active_object
-    for n in actionBones(actName):
-        if n in rig.data.bones:
-            b = rig.pose.bones[n]
-            for c in b.constraints:
-                if c.type == 'ACTION':
-                    if c.action != None:
-                        if c.action.name == actName:
-                            c.enabled = bool
-
 def editAction(actName):
     rig = bpy.context.active_object
     if rig.animation_data.action == None or rig.animation_data.action.name != actName:
+        if rig.animation_data == None:
+            rig.animation_data_create()
         rig.animation_data.action = bpy.data.actions[actName]
-        actionCons(actName, False)
+        delActionCons(actName, False, False)
         for a in bpy.data.actions:
             if a.name != actName:
-                actionCons(a.name, True)
+                delActionCons(a.name, False, True)
     else:
         rig.animation_data.action = None
-        actionCons(actName, True)
+        delActionCons(actName, False, True)
 
 def makeAction():
     rig = bpy.context.active_object
@@ -136,14 +99,14 @@ def delActions(mode):
     if val == (len(bpy.data.actions)):
         bpy.context.scene["rig_action_index"] = val-1
 
-def makeActionCons(nameCons, boneOwnerName, boneTargetName, actName, f_start, f_end, v_min, v_max, bone_channel, space_trans, infl):
+def makeActionCons(nameCons, boneOwnerName, boneTargetName, actName, f_start, f_end, v_min, v_max, bone_channel, space_trans, influence):
     rig = bpy.context.active_object
     pBone = rig.pose.bones[boneOwnerName]
     c = pBone.constraints.new(type = "ACTION")
     c.name = nameCons
     c.target = rig
     c.subtarget = boneTargetName
-    c.influence = infl
+    c.influence = influence
     c.transform_channel = bone_channel
     c.target_space = space_trans
     c.min = v_min
@@ -153,17 +116,51 @@ def makeActionCons(nameCons, boneOwnerName, boneTargetName, actName, f_start, f_
     c.frame_end = f_end
     pBone.constraints.move(len(pBone.constraints)-1, 0)
 
-
-def automatedAction(rfrsh):
-    start_time = time.time()
-    ##--Addition of actions constraints for automate controls
-    for a in [x for x in bpy.data.actions if actionMapProp in x.name]:
-        if rfrsh:
-            delActionCons(a.name, True, False)
-            SnglMtActn(a.name)
-        else:
-            SnglMtActn(a.name)
-#    if rfrsh:
-#        cs_defUi.showPopup("%ss applied and updated"%actionMapProp)
-    print("Add %ss:"%actionMapProp, str((time.time() - start_time))[:5])
-
+def setRigActionCons(actName):
+    def getSides(word):
+        sideL = ("_L", ".L")
+        sideR = ("_R", ".R")
+        useL = any(((e in word) for e in sideL))
+        useR = any(((e in word) for e in sideR))
+        usedSide = "noSide" if not (useL and useR) else "sideL" if useL else "sideR" 
+        return usedSide 
+        
+    a = bpy.data.actions.get(actName)
+    map = a.get(actionMapProp) if a else None
+    if map:
+        for d in map:
+            for n in actionBones(actName):
+                matchSide = (getSides(d["bone"]) == getSides(n)) or (getSides(d["bone"]) == "noSide")
+                filterMatch = matchSide or (getSides(n) == "noSide")
+                filter = (d["filter"] in n) if d["filter"] != "automatic" else filterMatch
+                
+                if filter:
+                    noMatchSide = 0.5 if getSides(n) == "noSide" else 0.0
+                    autoValue = 1.0 if matchSide else noMatchSide
+                    influence = d["influence"] if d["influence"] != "automatic" else autoValue
+                    
+                    makeActionCons(actName, 
+                    n, 
+                    d["bone"], 
+                    actName, 
+                    d["f_start"], 
+                    d["f_end"], 
+                    d["v_min"], 
+                    d["v_max"], 
+                    d["channel"], 
+                    d["space"], 
+                    influence)
+                    
+def inAllActions(mode, all=False, erase=False, bool=False):
+    for a in bpy.data.actions:
+        if a.get("canUse") or all:
+            if mode == "constraint":
+                delActionCons(a.name, erase, bool)
+            elif mode == "fakeUser":
+                a.use_fake_user = bool
+            elif mode == "setActionsProps":
+                setActionsProps(a.name)
+            elif mode == "setRigActionCons":
+                setRigActionCons(a.name)
+                
+                

@@ -50,7 +50,7 @@ def unregister():
     from .quimera_UI import unrgs
     unrgs()
     
-    from .quimera_rigActions_UI import rgs
+    from .quimera_rigActions_UI import unrgs
     unrgs()
 
     bpy.utils.unregister_class(QuimeraPreferences)

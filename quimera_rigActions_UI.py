@@ -20,20 +20,30 @@ def logicDraw() -> bool:
         if bpy.context.active_object.type in obTypes:
             return True
 
+def logicDrawInfo(col):
+    col.label(text="Only avaible for object types: "+str(obTypes)[1:][:-1])
+    col.label(text="In modes: "+str(drawModes)[1:][:-1])
+
 class ACTION_UL_list(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
-            eyes = ["HIDE_ON", "HIDE_OFF"]
             if bpy.context.active_object.animation_data == None:
-                bool = False
+                eyes = "HIDE_ON"
             else:
-                bool = (bpy.context.active_object.animation_data.action == item)
-            row = layout.row(align = 1)
+                eyes = "HIDE_OFF" if bpy.context.active_object.animation_data.action == item else "HIDE_ON"
+            rowM = layout.row(align = 1)
 
-            row.active = "" in item.name
+            if "canUse" in item:
+                rowM.prop(item, '["canUse"]', text="")
+            else:              
+                rowM.label(text="", icon="BLANK1")
+                
+            row = rowM.row(align = 1)
+            row.active = True if item.get("canUse") else False
+            
             row.scale_x = 1.2
             row.operator(execFunc,text="", icon="RESTRICT_SELECT_OFF").function= modul+".selectActionBones('"+item.name+"')"
-            row.operator(execFunc,text="", icon = eyes[bool]).function= modul+".editAction('"+item.name+"')"
+            row.operator(execFunc,text="", icon = eyes).function= modul+".editAction('"+item.name+"')"
             row.prop(item, "name", text="", emboss=False)
             row.prop(item, 'use_fake_user', text="")
 
@@ -63,9 +73,7 @@ class PANEL_PT_RigActions(bpy.types.Panel):
             row.separator()
             row.menu(MENU_MT_RigActions.bl_idname,text="", icon="DOWNARROW_HLT")
         else:
-            col = layout.column()
-            col.label(text="Only avaible for object types: "+str(obTypes)[1:][:-1])
-            col.label(text="In modes: "+str(drawModes)[1:][:-1])
+            logicDrawInfo(layout.column())
 
 classes.append(PANEL_PT_RigActions)
 
@@ -94,21 +102,19 @@ class PANEL_PT_RigActionsProps(bpy.types.Panel):
                     BxB = col.box().column(align = 1)
                     ruw = BxT.row(align = 1)
                     
-                    rwList = a[actionMapProp]
-                    for d in rwList:
-                        for p in d:
-                            if a["slotMap"] == rwList.index(d):
-                                row = BxB.row(align = 1)
-                                if p == "auto":
+                    rwList = a.get(actionMapProp)
+                    if rwList:
+                        for d in rwList:
+                            for p in d:
+                                if a["slotMap"] == rwList.index(d):
+                                    row = BxB.row(align = 1)
+
+    #                                csBool = not((p == "influence" or p == "filter") and d["auto"])
+    #                                row.enabled = csBool
                                     row.label(text=p)
-#                                    row.prop(a, '["'+p+'"]', text=p)
-                                else:
-                                    csBool = not((p == "influence" or p == "filter") and d["auto"])
-                                    row.enabled = csBool
-                                    row.label(text=p)
-#                                    row = BxB.row(align = 1)
-#                                    row.enabled = csBool
-#                                    row.prop(a, '["'+p+'"]', text="")
+    #                                row = BxB.row(align = 1)
+    #                                row.enabled = csBool
+    #                                row.prop(a, '["'+p+'"]', text="")
 
                     for s in range(len(a[actionMapProp])):
                         operation = "bpy.data.actions['%s']"%a.name+"['slotMap'] = %s"%str(s)
@@ -116,9 +122,7 @@ class PANEL_PT_RigActionsProps(bpy.types.Panel):
                     ruw.operator(execFunc,text="", icon="ADD").function= modul+".setActionsProps('"+a.name+"', mode='addSlot')"
                     ruw.operator(execFunc,text="", icon="REMOVE").function= modul+".setActionsProps('"+a.name+"', mode='delSlot', channelMap = %s)"%str(a['slotMap'])
         else:
-            col = layout.column()
-            col.label(text="Only avaible for object types: "+str(obTypes)[1:][:-1])
-            col.label(text="In modes: "+str(drawModes)[1:][:-1])
+            logicDrawInfo(layout.column())
 
 classes.append(PANEL_PT_RigActionsProps)
 
@@ -130,7 +134,7 @@ class MENU_MT_RigActions(bpy.types.Menu):
     def draw(self, context):
         layout = self.layout
         col = layout.column()
-        col.operator(execFunc,text="Remove all actions", icon = "PANEL_CLOSE").function= modul+".rmvActns('all')"
+        col.operator(execFunc,text="Remove all actions", icon = "PANEL_CLOSE").function= modul+"inAllActions('constraint', all=False, erase=False, bool=False)"
         col.operator(execFunc,text="Remove all no %ss"%rigActName, icon = "PANEL_CLOSE").function= modul+".rmvActns('dntMt')"
         col.separator()
         col.operator(execFunc,text="Remove all actions constraints", icon = "PANEL_CLOSE").function= modul+".mngActCnstrnts(False, False, True, False)"
@@ -156,13 +160,19 @@ classes.append(MENU_MT_RigActions)
 
 def rgs():
     for c in classes:
-        bpy.utils.register_class(c)
+        try:
+            bpy.utils.register_class(c)
+        except:
+            continue
     bpy.types.Scene.rig_action_index = bpy.props.IntProperty()
 
 def unrgs():
     for c in reversed(classes):
         bpy.utils.unregister_class(c)
-    del bpy.types.Scene.rig_action_index
+    try:
+        del bpy.types.Scene.rig_action_index
+    except:
+        pass
 
 if __name__ == "__main__":
     rgs()

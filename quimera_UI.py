@@ -41,7 +41,7 @@ class MENU_MT_CustomRigTemplates(bpy.types.Menu):
                     button = layout.operator(execFunc,text = s[:-len(ext)])
                     button.function = "importRig('%s')"%s
         else:
-            layout.label(text = "No enabled loads rig templates")
+            layout.label(text = "No enabled load rig templates")
 
 classes.append(MENU_MT_CustomRigTemplates)
 
