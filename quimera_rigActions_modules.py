@@ -10,13 +10,13 @@ actionProps = strProps + intProps + boolProps
 
 mapAct = {"filter": "",
     "bone": "",
-    "v_min": "",
-    "v_max": "",
-    "channel": "",
-    "space": "",
-    "f_start": "",
-    "f_end": "",
-    "influence": ""}
+    "v_min": 0.0,
+    "v_max": 1.0,
+    "channel": "LOCATION_X",
+    "space": "LOCAL",
+    "f_start": 0,
+    "f_end": 10,
+    "influence": 1.0}
 
 def setActionsProps(actName, mode = "refresh", channelMap = 0, mapProp = "", mapPropValue = ""):
     if mode == "refresh":
@@ -162,5 +162,8 @@ def inAllActions(mode, all=False, erase=False, bool=False):
                 setActionsProps(a.name)
             elif mode == "setRigActionCons":
                 setRigActionCons(a.name)
+                
+             
+                
                 
                 
