@@ -177,6 +177,8 @@ class PANEL_PT_RigActionsProps(bpy.types.Panel):
                             for p in d:
                                 if a["slotMap"] == rwList.index(d):
                                     txt = str(d[p])
+                                    if isinstance(d[p], float):
+                                        txt = f"{d[p]:.2f}"
                                     if p == "bone":
                                         row = boxBottom.column(align = 0)
                                         row.alert = not (txt in bpy.context.active_object.data.bones)
