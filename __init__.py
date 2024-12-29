@@ -9,7 +9,9 @@ bl_info = {
     'tracker_url': '',
     'category': 'Rigging'}
 
-import bpy
+import bpy, time, traceback
+
+tabName = "Quimera Rigging Tools"
 
 class QuimeraPreferences(bpy.types.AddonPreferences):
     bl_idname = __name__
@@ -29,6 +31,16 @@ class QuimeraPreferences(bpy.types.AddonPreferences):
         row.enabled = self.loadRigsTemplates
         row.prop(self, "rigsTemplates", text = "Templates folder")
 
+def myTimer(func):
+    def wrapper(*args, **kwargs):
+        print(f"{func.__name__}{args} starts")
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = round(time.time() - start_time, 4)
+        print(f'{func.__name__}{args} finished in {end_time} seconds')
+        return result
+    return wrapper
+        
 def register():
     bpy.utils.register_class(QuimeraPreferences)
     

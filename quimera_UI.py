@@ -1,8 +1,12 @@
 import os
 import bpy
-from . import quimera_rigModules, quimera_rigActions_modules
+from . import quimera_rigModules, quimera_rigActions_modules, tabName
 
 classes = []
+
+tab = tabName
+panName = "Quimera tools"
+
 addonName = os.path.dirname(os.path.realpath(__file__)).split("\\")[-1]
 execFunc = "quimera.function"
 
@@ -67,13 +71,13 @@ class PANEL_PT_QuimeraMain(bpy.types.Panel):
 
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = 'Quimera Rigging Tools'
+    bl_category = tab
     bl_label = ""
     bl_options = {"HEADER_LAYOUT_EXPAND"}
 
     def draw_header(self, context):
         layout = self.layout
-        layout.label(text="Quimera tools", icon="CONSTRAINT_BONE")
+        layout.label(text=panName, icon="CONSTRAINT_BONE")
 
     def draw(self, context):
         layout = self.layout

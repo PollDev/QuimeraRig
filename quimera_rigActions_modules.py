@@ -1,6 +1,5 @@
 import bpy
-import time
- 
+from . import myTimer
 actionMapProp = "automatism"
 
 strProps = [actionMapProp]
@@ -8,17 +7,17 @@ intProps = ["slotMap"]
 boolProps = ["canUse"]
 actionProps = strProps + intProps + boolProps
 
-mapAct = {"filter": "",
+mapAct = {"filter": {"value":"", "auto":False},
     "bone": "",
     "v_min": 0.0,
     "v_max": 1.0,
     "channel": "LOCATION_X",
     "space": "LOCAL",
-    "f_start": 0,
-    "f_end": 10,
-    "influence": 1.0}
+    "f_start": {"value":0, "auto":False},
+    "f_end": {"value":10, "auto":False},
+    "influence": {"value":1.0, "auto":False}}
 
-def setActionsProps(actName, mode = "refresh", channelMap = 0, mapProp = "", mapPropValue = ""):
+def setActionsProps(actName, mode = "refresh", channelMap = 0, mapProp = "", mapPropChannel = "value", mapPropValue = ""):
     if mode == "refresh":
         prp = [p[0] for p in bpy.data.actions[actName].items()]
         for n in actionProps:
@@ -30,7 +29,11 @@ def setActionsProps(actName, mode = "refresh", channelMap = 0, mapProp = "", map
                 else:
                     bpy.data.actions[actName][n] = [mapAct]
     elif mode == "update":
-        bpy.data.actions[actName][actionMapProp][channelMap].update({mapProp:mapPropValue})
+        p = bpy.data.actions[actName][actionMapProp][channelMap].get(mapProp)
+        if hasattr(p, '__iter__') and type(p)!=str:
+            bpy.data.actions[actName][actionMapProp][channelMap][mapProp].update({mapPropChannel:mapPropValue})
+        else:
+            bpy.data.actions[actName][actionMapProp][channelMap].update({mapProp:mapPropValue})
     elif mode == "addSlot":
         bpy.data.actions[actName][actionMapProp] = bpy.data.actions[actName][actionMapProp] + [mapAct]
     elif mode == "delSlot" and len(bpy.data.actions[actName][actionMapProp]) > 1:
@@ -116,13 +119,14 @@ def makeActionCons(nameCons, boneOwnerName, boneTargetName, actName, f_start, f_
     c.frame_end = f_end
     pBone.constraints.move(len(pBone.constraints)-1, 0)
 
+@myTimer
 def setRigActionCons(actName):
     def getSides(word):
         sideL = ("_L", ".L")
         sideR = ("_R", ".R")
         useL = any(((e in word) for e in sideL))
         useR = any(((e in word) for e in sideR))
-        usedSide = "noSide" if not (useL and useR) else "sideL" if useL else "sideR" 
+        usedSide = ("sideL" if useL else "sideR") if any((useL, useR)) else "noSide"
         return usedSide 
         
     a = bpy.data.actions.get(actName)
@@ -130,21 +134,19 @@ def setRigActionCons(actName):
     if map:
         for d in map:
             for n in actionBones(actName):
-                matchSide = (getSides(d["bone"]) == getSides(n)) or (getSides(d["bone"]) == "noSide")
-                filterMatch = matchSide or (getSides(n) == "noSide")
-                filter = (d["filter"] in n) if d["filter"] != "automatic" else filterMatch
-                
+                filterMatch = getSides(d["bone"]) == "noSide" or any((getSides(d["bone"]) == getSides(n), getSides(n) == "noSide"))
+                filter = filterMatch if d["filter"]["auto"] else (d["filter"]["value"] in n)
+
                 if filter:
-                    noMatchSide = 0.5 if getSides(n) == "noSide" else 0.0
-                    autoValue = 1.0 if matchSide else noMatchSide
-                    influence = d["influence"] if d["influence"] != "automatic" else autoValue
+                    autoValue = 1.0 if getSides(d["bone"]) == "noSide" else (0.5 if getSides(n) == "noSide" else 1.0)
+                    influence = autoValue if d["influence"]["auto"] else d["influence"]["value"]
                     
-                    makeActionCons(actName, 
+                    makeActionCons(actName,
                     n, 
                     d["bone"], 
                     actName, 
-                    d["f_start"], 
-                    d["f_end"], 
+                    round(a.frame_range[0]) if d["f_start"]["auto"] else d["f_start"]["value"], 
+                    round(a.frame_range[1]) if d["f_end"]["auto"] else d["f_end"]["value"], 
                     d["v_min"], 
                     d["v_max"], 
                     d["channel"], 
@@ -161,6 +163,7 @@ def inAllActions(mode, all=False, erase=False, bool=False):
             elif mode == "setActionsProps":
                 setActionsProps(a.name)
             elif mode == "setRigActionCons":
+                delActionCons(a.name, True, bool)
                 setRigActionCons(a.name)
                 
              

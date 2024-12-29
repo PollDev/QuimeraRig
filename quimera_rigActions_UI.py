@@ -1,13 +1,12 @@
 import bpy
+from . import tabName
+from .quimera_rigActions_modules import actionProps, actionMapProp
 
 classes = []
 
-tab = "Quimera Rigging Tools"
+tab = tabName
 panName = "Rig Actions"
 rigActName = panName[:-1]
-
-actionMapProp = "automatism"
-actionProps = [actionMapProp, "slotMap", "canUse"]
 
 drawModes = {"POSE"}
 obTypes = {"ARMATURE"}
@@ -26,17 +25,16 @@ def logicDrawInfo(col):
 
 class ACTION_UL_list(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
+        rig = bpy.context.active_object
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
-            if bpy.context.active_object.animation_data == None:
-                eyes = "HIDE_ON"
-            else:
-                eyes = "HIDE_OFF" if bpy.context.active_object.animation_data.action == item else "HIDE_ON"
+            # if rig.animation_data == None:
+            #     eyes = "HIDE_ON"
+            # else:
+            eyes = "HIDE_ON" if rig.animation_data == None or rig.animation_data.action != item else "HIDE_OFF"
             rowM = layout.row(align = 1)
 
-            if "canUse" in item:
-                rowM.prop(item, '["canUse"]', text="")
-            else:              
-                rowM.label(text="", icon="BLANK1")
+            if "canUse" in item: rowM.prop(item, '["canUse"]', text="")
+            else: rowM.label(text="", icon="BLANK1")
                 
             row = rowM.row(align = 1)
             row.active = True if item.get("canUse") else False
@@ -176,9 +174,8 @@ class PANEL_PT_RigActionsProps(bpy.types.Panel):
                         for d in rwList:
                             for p in d:
                                 if a["slotMap"] == rwList.index(d):
-                                    txt = str(d[p])
-                                    if isinstance(d[p], float):
-                                        txt = f"{d[p]:.2f}"
+                                    noDct = d[p] if any((type(d[p])==v for v in (str, int, float))) else d[p]["value"]
+                                    txt = noDct if type(noDct) == str else str(round(noDct, 3))
                                     if p == "bone":
                                         row = boxBottom.column(align = 0)
                                         row.alert = not (txt in bpy.context.active_object.data.bones)
@@ -186,11 +183,19 @@ class PANEL_PT_RigActionsProps(bpy.types.Panel):
                                         row.alert = False
                                         row.template_list("BONES_UL_list", "", bpy.context.active_object.data, "bones", bpy.context.scene, "rig_action_index")
                                     elif not(p == "space" or p == "channel"):
-                                        row = boxBottom.box().row(align = 0)
+                                        row = boxBottom.box().row(align = 1)
                                         row.scale_x = 0.3
                                         row.label(text=p+":")
                                         row.scale_x = 1
-                                        row.operator("quimera.run_menu" , text=txt).prop = p
+                                        if not(p == "v_min" or p == "v_max"):
+                                            if not d[p]["auto"]:
+                                                row.operator("quimera.run_menu" , text=txt).prop = p
+                                                row.scale_x = 0.3
+                                            w = modul+'.setActionsProps("%s", mode = "update", channelMap = %s, mapProp = "%s", mapPropChannel = "auto", mapPropValue = %s)'
+                                            f = w%(a.name, a["slotMap"], p, not d[p]["auto"])
+                                            row.operator(execFunc, text="Automatic", icon= "CHECKBOX_HLT" if d[p]["auto"] else "CHECKBOX_DEHLT").function= f
+                                        else:
+                                            row.operator("quimera.run_menu" , text=txt).prop = p
                                     else:
                                         row = boxBottom.box().row(align = 0)
                                         row.scale_x = 0.3
@@ -219,7 +224,7 @@ def drawEditOp(col, propName, propValue):
             v = propValue
             w = modul+'.setActionsProps("%s", mode = "update", channelMap = %s, mapProp = "%s", mapPropValue = "%s")'
             f = w%(a.name, a["slotMap"], n, v)
-            col.operator(execFunc,text=v).function= f
+            col.operator(execFunc,text=v,depress=p[a["slotMap"]][n]==v).function= f
         else:
             col.label(text=str(propValue))
     else:
@@ -245,11 +250,13 @@ class OBJECT_OT_RunMenu(bpy.types.Operator):
     def execute(self, context):
         i = bpy.context.scene.get("rig_action_index")
         if i != None:
+            t = bpy.context.scene["tmpSwap"]
             a = bpy.data.actions[i]
             p = self.prop
-            v = bpy.context.scene["tmpSwap"]
-            w = modul+'.setActionsProps("%s", mode = "update", channelMap = %s, mapProp = "%s", mapPropValue = %s)'%(a.name, a["slotMap"], p, v)
-            bpy.ops.quimera.function(function=w)
+            v = '"'+t+'"' if type(t)==str else t
+            w = modul+'.setActionsProps("%s", mode = "update", channelMap = %s, mapProp = "%s", mapPropValue = %s)'
+            f = w%(a.name, a["slotMap"], p, v)
+            bpy.ops.quimera.function(function=f)
         return {"FINISHED"}
 
     def invoke(self, context, event):
@@ -258,14 +265,20 @@ class OBJECT_OT_RunMenu(bpy.types.Operator):
             a = bpy.data.actions[i]
             p = self.prop
             v = a[actionMapProp][a["slotMap"]][p]
+            v = v if any((type(v)==ty for ty in (str, int, float))) else v['value']
             bpy.context.scene["tmpSwap"] = v 
+            ui = bpy.context.scene.id_properties_ui("tmpSwap")
+            if p == "influence":
+                ui.update(min=0.0, max=1.0, soft_min=0.0, soft_max=1.0)
+            elif p != "filter":
+                limit = 1000000 if type(v) == int else 1000000.0
+                ui.update(min=-limit, max=limit, soft_min=-limit, soft_max=limit)
         return context.window_manager.invoke_props_dialog(self, width = 200, title ="Edit "+p)
     
     def draw(self, context):
         layout = self.layout
         col = layout.column()
         col.prop(bpy.context.scene, '["tmpSwap"]', text="")
-        drawEditOp(col, self.prop, "'automatic'")
     
 classes.append(OBJECT_OT_RunMenu)
 
