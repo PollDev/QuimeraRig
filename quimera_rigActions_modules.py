@@ -13,6 +13,8 @@ mapAct = {"filter": {"value":"", "auto":False},
     "v_max": 1.0,
     "channel": "LOCATION_X",
     "space": "LOCAL",
+    "spaceBone": "",
+    "mixMode": "BEFORE_SPLIT",
     "f_start": {"value":0, "auto":False},
     "f_end": {"value":10, "auto":False},
     "influence": {"value":1.0, "auto":False}}
@@ -73,9 +75,9 @@ def selectActionBones(actName):
 
 def editAction(actName):
     rig = bpy.context.active_object
+    if rig.animation_data == None:
+        rig.animation_data_create()
     if rig.animation_data.action == None or rig.animation_data.action.name != actName:
-        if rig.animation_data == None:
-            rig.animation_data_create()
         rig.animation_data.action = bpy.data.actions[actName]
         delActionCons(actName, False, False)
         for a in bpy.data.actions:
@@ -102,7 +104,7 @@ def delActions(mode):
     if val == (len(bpy.data.actions)):
         bpy.context.scene["rig_action_index"] = val-1
 
-def makeActionCons(nameCons, boneOwnerName, boneTargetName, actName, f_start, f_end, v_min, v_max, bone_channel, space_trans, influence):
+def makeActionCons(nameCons, boneOwnerName, boneTargetName, actName, f_start, f_end, v_min, v_max, bone_channel, space_trans, influence, mix_mode, space_bone):
     rig = bpy.context.active_object
     pBone = rig.pose.bones[boneOwnerName]
     c = pBone.constraints.new(type = "ACTION")
@@ -112,11 +114,14 @@ def makeActionCons(nameCons, boneOwnerName, boneTargetName, actName, f_start, f_
     c.influence = influence
     c.transform_channel = bone_channel
     c.target_space = space_trans
+    c.space_object = rig
+    c.space_subtarget = space_bone
     c.min = v_min
     c.max = v_max
     c.action = bpy.data.actions[actName]
     c.frame_start = f_start
     c.frame_end = f_end
+    c.mix_mode = mix_mode
     pBone.constraints.move(len(pBone.constraints)-1, 0)
 
 @myTimer
@@ -141,7 +146,7 @@ def setRigActionCons(actName):
                     autoValue = 1.0 if getSides(d["bone"]) == "noSide" else (0.5 if getSides(n) == "noSide" else 1.0)
                     influence = autoValue if d["influence"]["auto"] else d["influence"]["value"]
                     
-                    makeActionCons(actName,
+                    makeActionCons(actName+"_manager_"+d["bone"],
                     n, 
                     d["bone"], 
                     actName, 
@@ -151,7 +156,9 @@ def setRigActionCons(actName):
                     d["v_max"], 
                     d["channel"], 
                     d["space"], 
-                    influence)
+                    influence,
+                    d["mixMode"],
+                    d["spaceBone"])
                     
 def inAllActions(mode, all=False, erase=False, bool=False):
     for a in bpy.data.actions:

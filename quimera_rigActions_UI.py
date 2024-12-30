@@ -129,6 +129,25 @@ class MENU_MT_ActionChannel(bpy.types.Menu):
             
 classes.append(MENU_MT_ActionChannel)
 
+class MENU_MT_ActionMixMode(bpy.types.Menu):
+
+    bl_label = "Mix mode"
+    bl_idname = "MENU_MT_ActionMixMode"
+
+    def draw(self, context):
+        layout = self.layout
+        lst = ('BEFORE_FULL',
+            'BEFORE',
+            'BEFORE_SPLIT',
+            'AFTER_FULL',
+            'AFTER',
+            'AFTER_SPLIT')
+        col = layout.column()
+        for i in lst:
+            drawEditOp(col, "mixMode", i)
+            
+classes.append(MENU_MT_ActionMixMode)
+
 class MENU_MT_ActionSpace(bpy.types.Menu):
 
     bl_label = "Action space"
@@ -136,7 +155,12 @@ class MENU_MT_ActionSpace(bpy.types.Menu):
 
     def draw(self, context):
         layout = self.layout
-        lst = ("LOCAL", "WORLD")
+        lst = ("WORLD", 
+               "CUSTOM", 
+               "POSE", 
+               "LOCAL_WITH_PARENT", 
+               "LOCAL", 
+               "LOCAL_OWNER_ORIENT")
         col = layout.column()
         for i in lst:
             drawEditOp(col, "space", i)
@@ -176,13 +200,22 @@ class PANEL_PT_RigActionsProps(bpy.types.Panel):
                                 if a["slotMap"] == rwList.index(d):
                                     noDct = d[p] if any((type(d[p])==v for v in (str, int, float))) else d[p]["value"]
                                     txt = noDct if type(noDct) == str else str(round(noDct, 3))
-                                    if p == "bone":
-                                        row = boxBottom.column(align = 0)
-                                        row.alert = not (txt in bpy.context.active_object.data.bones)
-                                        row.box().label(text=p+": "+txt, icon = "BONE_DATA")
-                                        row.alert = False
-                                        row.template_list("BONES_UL_list", "", bpy.context.active_object.data, "bones", bpy.context.scene, "rig_action_index")
-                                    elif not(p == "space" or p == "channel"):
+                                    if p == "bone" or p == "spaceBone":
+                                        if p == "bone" or d["space"] == 'CUSTOM':
+                                            row = boxBottom.box().row(align = 0)
+                                            row.alert = not (txt in bpy.context.active_object.data.bones)
+                                            row.scale_x = 0.3
+                                            row.label(text=p+":", icon = "BONE_DATA")
+                                            row.alert = False
+                                            row.scale_x = 1
+                                            row.operator("quimera.run_menu" , text=txt).prop = p
+                                    elif any((p == t for t in ("space", "channel", "mixMode"))):
+                                        row = boxBottom.box().row(align = 0)
+                                        row.scale_x = 0.3
+                                        row.label(text=p+":")
+                                        row.scale_x = 1
+                                        row.menu("MENU_MT_Action"+p[:1].upper()+p[1:], text=txt)
+                                    else:
                                         row = boxBottom.box().row(align = 1)
                                         row.scale_x = 0.3
                                         row.label(text=p+":")
@@ -196,12 +229,6 @@ class PANEL_PT_RigActionsProps(bpy.types.Panel):
                                             row.operator(execFunc, text="Automatic", icon= "CHECKBOX_HLT" if d[p]["auto"] else "CHECKBOX_DEHLT").function= f
                                         else:
                                             row.operator("quimera.run_menu" , text=txt).prop = p
-                                    else:
-                                        row = boxBottom.box().row(align = 0)
-                                        row.scale_x = 0.3
-                                        row.label(text=p+":")
-                                        row.scale_x = 1
-                                        row.menu("MENU_MT_Action"+p.capitalize(), text=txt)
                                     row.separator()
 
                         for s in range(len(a[actionMapProp])):
@@ -234,9 +261,9 @@ class BONES_UL_list(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             rowM = layout.row(align = 1)
-            drawEditOp(rowM, "bone", item.name)
-
-classes.append(BONES_UL_list)    
+            f = f'bpy.context.scene["tmpSwap"] = "{item.name}"'
+            rowM.operator(execFunc,text=item.name,depress=item.name==bpy.context.scene["tmpSwap"]).function= f
+classes.append(BONES_UL_list)
 
 class OBJECT_OT_RunMenu(bpy.types.Operator):
     
@@ -245,7 +272,7 @@ class OBJECT_OT_RunMenu(bpy.types.Operator):
     bl_idname = "quimera.run_menu" 
     bl_label = "run menu"
     bl_options = {'UNDO', 'INTERNAL'}
-    prop: bpy.props.StringProperty()
+    prop: bpy.props.StringProperty(default='noidea')
     
     def execute(self, context):
         i = bpy.context.scene.get("rig_action_index")
@@ -270,7 +297,7 @@ class OBJECT_OT_RunMenu(bpy.types.Operator):
             ui = bpy.context.scene.id_properties_ui("tmpSwap")
             if p == "influence":
                 ui.update(min=0.0, max=1.0, soft_min=0.0, soft_max=1.0)
-            elif p != "filter":
+            elif p != "filter" and not 'bone' in self.prop.lower():
                 limit = 1000000 if type(v) == int else 1000000.0
                 ui.update(min=-limit, max=limit, soft_min=-limit, soft_max=limit)
         return context.window_manager.invoke_props_dialog(self, width = 200, title ="Edit "+p)
@@ -278,7 +305,10 @@ class OBJECT_OT_RunMenu(bpy.types.Operator):
     def draw(self, context):
         layout = self.layout
         col = layout.column()
-        col.prop(bpy.context.scene, '["tmpSwap"]', text="")
+        if 'bone' in self.prop.lower():
+            col.template_list("BONES_UL_list", "", bpy.context.active_object.data, "bones", bpy.context.scene, "rig_action_index")
+        else:
+            col.prop(bpy.context.scene, '["tmpSwap"]', text="")
     
 classes.append(OBJECT_OT_RunMenu)
 
