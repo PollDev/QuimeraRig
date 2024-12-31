@@ -1,5 +1,5 @@
 import bpy
-from . import tabName
+from . import tabName, transChannels
 from .quimera_rigActions_modules import actionProps, actionMapProp
 
 classes = []
@@ -114,17 +114,8 @@ class MENU_MT_ActionChannel(bpy.types.Menu):
 
     def draw(self, context):
         layout = self.layout
-        lst = ("LOCATION_X",
-            "LOCATION_Y",
-            "LOCATION_Z",
-            "ROTATION_X",
-            "ROTATION_Y",
-            "ROTATION_Z",
-            "SCALE_X",
-            "SCALE_Y",
-            "SCALE_Z")
         col = layout.column()
-        for i in lst:
+        for i in transChannels:
             drawEditOp(col, "channel", i)
             
 classes.append(MENU_MT_ActionChannel)
@@ -202,13 +193,17 @@ class PANEL_PT_RigActionsProps(bpy.types.Panel):
                                     txt = noDct if type(noDct) == str else str(round(noDct, 3))
                                     if p == "bone" or p == "spaceBone":
                                         if p == "bone" or d["space"] == 'CUSTOM':
-                                            row = boxBottom.box().row(align = 0)
+                                            row = boxBottom.box().row(align = 1)
                                             row.alert = not (txt in bpy.context.active_object.data.bones)
                                             row.scale_x = 0.3
                                             row.label(text=p+":", icon = "BONE_DATA")
                                             row.alert = False
                                             row.scale_x = 1
                                             row.operator("quimera.run_menu" , text=txt).prop = p
+                                            v = bpy.context.active_bone.name
+                                            w = modul+'.setActionsProps("%s", mode = "update", channelMap = %s, mapProp = "%s", mapPropValue = "%s")'
+                                            f = w%(a.name, a["slotMap"], p, v)
+                                            row.operator(execFunc, text='', icon='EYEDROPPER').function= f
                                     elif any((p == t for t in ("space", "channel", "mixMode"))):
                                         row = boxBottom.box().row(align = 0)
                                         row.scale_x = 0.3
@@ -229,6 +224,7 @@ class PANEL_PT_RigActionsProps(bpy.types.Panel):
                                             row.operator(execFunc, text="Automatic", icon= "CHECKBOX_HLT" if d[p]["auto"] else "CHECKBOX_DEHLT").function= f
                                         else:
                                             row.operator("quimera.run_menu" , text=txt).prop = p
+                                            row.operator(execFunc, text='', icon='EYEDROPPER').function= modul+f'.autoMapTransformChannel("{a.name}", {a["slotMap"]}, "{p}", "{d["channel"]}")'
                                     row.separator()
 
                         for s in range(len(a[actionMapProp])):
@@ -263,6 +259,7 @@ class BONES_UL_list(bpy.types.UIList):
             rowM = layout.row(align = 1)
             f = f'bpy.context.scene["tmpSwap"] = "{item.name}"'
             rowM.operator(execFunc,text=item.name,depress=item.name==bpy.context.scene["tmpSwap"]).function= f
+
 classes.append(BONES_UL_list)
 
 class OBJECT_OT_RunMenu(bpy.types.Operator):
@@ -272,7 +269,7 @@ class OBJECT_OT_RunMenu(bpy.types.Operator):
     bl_idname = "quimera.run_menu" 
     bl_label = "run menu"
     bl_options = {'UNDO', 'INTERNAL'}
-    prop: bpy.props.StringProperty(default='noidea')
+    prop: bpy.props.StringProperty()
     
     def execute(self, context):
         i = bpy.context.scene.get("rig_action_index")

@@ -1,7 +1,6 @@
 import os
 import bpy
-from . import quimera_rigModules, quimera_rigActions_modules, tabName
-
+from . import tabName, popUp
 classes = []
 
 tab = tabName
@@ -9,26 +8,6 @@ panName = "Quimera tools"
 
 addonName = os.path.dirname(os.path.realpath(__file__)).split("\\")[-1]
 execFunc = "quimera.function"
-
-class OBJECT_OT_ExecFunctions(bpy.types.Operator):
-    
-    """Operator for exec functions"""
-    
-    bl_idname = "quimera.function" 
-    bl_label = "Quimera exec functions"
-    bl_options = {'UNDO', 'INTERNAL'}
-    function: bpy.props.StringProperty()
-    tool_tip: bpy.props.StringProperty()
-    
-    @classmethod
-    def description(cls, context, properties):
-        return properties.tool_tip
-    
-    def execute(self, context):
-        exec(self.function)   
-        return {"FINISHED"}
-
-classes.append(OBJECT_OT_ExecFunctions)
 
 class MENU_MT_CustomRigTemplates(bpy.types.Menu):
     
@@ -48,11 +27,6 @@ class MENU_MT_CustomRigTemplates(bpy.types.Menu):
             layout.label(text = "No enabled load rig templates")
 
 classes.append(MENU_MT_CustomRigTemplates)
-
-def popUp(message = "", title = "Report", icon = 'INFO'):
-    def draw(self, context):
-        self.layout.label(text=message)
-    bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
 
 def importRig(fileName):
     try:

@@ -1,17 +1,27 @@
 bl_info = {
-    'name': 'Quimera tools',
+    'name': "Quimera Tools",
     'author': 'Pablo Ebed Lopez de la Hoz',
     'version': (0,0,0),
     'blender': (4, 1, 0),
-    'location': 'View3d, Rig Tools',
+    'location': 'View3d, Quimera Tools',
     'description': 'Toolset for create and modify rigs',
     'wiki_url': '',
-    'tracker_url': '',
+    'tracker_url': 'https://github.com/PollDev/QuimeraRig/issues',
     'category': 'Rigging'}
 
-import bpy, time, traceback
+import bpy, time
 
-tabName = "Quimera Rigging Tools"
+tabName = "Quimera Tools"
+
+transChannels = ("LOCATION_X",
+                "LOCATION_Y",
+                "LOCATION_Z",
+                "ROTATION_X",
+                "ROTATION_Y",
+                "ROTATION_Z",
+                "SCALE_X",
+                "SCALE_Y",
+                "SCALE_Z")
 
 class QuimeraPreferences(bpy.types.AddonPreferences):
     bl_idname = __name__
@@ -40,10 +50,18 @@ def myTimer(func):
         print(f'{func.__name__}{args} finished in {end_time} seconds')
         return result
     return wrapper
-        
+
+def popUp(message = "", title = "Report", icon = 'INFO'):
+    def draw(self, context):
+        self.layout.label(text=message)
+    bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
+
 def register():
     bpy.utils.register_class(QuimeraPreferences)
     
+    from .quimera_commonUse import rgs
+    rgs()
+
     from .quimera_UI import rgs
     rgs()
 
@@ -58,7 +76,10 @@ def unregister():
     del bpy.types.Object.destiny_rig
     del bpy.types.Armature.script_postGeneration
     del bpy.types.Scene.rig_action_index
- 
+    
+    from .quimera_commonUse import unrgs
+    unrgs()
+
     from .quimera_UI import unrgs
     unrgs()
     

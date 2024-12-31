@@ -1,5 +1,6 @@
 import bpy
-from . import myTimer
+from math import degrees
+from . import myTimer, transChannels
 actionMapProp = "automatism"
 
 strProps = [actionMapProp]
@@ -38,6 +39,7 @@ def setActionsProps(actName, mode = "refresh", channelMap = 0, mapProp = "", map
             bpy.data.actions[actName][actionMapProp][channelMap].update({mapProp:mapPropValue})
     elif mode == "addSlot":
         bpy.data.actions[actName][actionMapProp] = bpy.data.actions[actName][actionMapProp] + [mapAct]
+        bpy.data.actions[actName]["slotMap"] = len(bpy.data.actions[actName][actionMapProp])-1
     elif mode == "delSlot" and len(bpy.data.actions[actName][actionMapProp]) > 1:
         lst = bpy.data.actions[actName][actionMapProp]
         del lst[channelMap]
@@ -142,7 +144,7 @@ def setRigActionCons(actName):
                 filterMatch = getSides(d["bone"]) == "noSide" or any((getSides(d["bone"]) == getSides(n), getSides(n) == "noSide"))
                 filter = filterMatch if d["filter"]["auto"] else (d["filter"]["value"] in n)
 
-                if filter:
+                if filter and d["bone"] != n:
                     autoValue = 1.0 if getSides(d["bone"]) == "noSide" else (0.5 if getSides(n) == "noSide" else 1.0)
                     influence = autoValue if d["influence"]["auto"] else d["influence"]["value"]
                     
@@ -172,8 +174,20 @@ def inAllActions(mode, all=False, erase=False, bool=False):
             elif mode == "setRigActionCons":
                 delActionCons(a.name, True, bool)
                 setRigActionCons(a.name)
-                
-             
+
+def autoMapTransformChannel(actName, channelMap, mapProp, transChannel):                
+    b = bpy.context.active_pose_bone
+    trans = (b.location[0],
+                b.location[1],
+                b.location[2],
+                degrees((b.rotation_euler[0],b.rotation_quaternion.to_euler()[0])[b.rotation_mode == 'QUATERNION']),
+                degrees((b.rotation_euler[1],b.rotation_quaternion.to_euler()[1])[b.rotation_mode == 'QUATERNION']),
+                degrees((b.rotation_euler[2],b.rotation_quaternion.to_euler()[2])[b.rotation_mode == 'QUATERNION']),
+                b.scale[0],
+                b.scale[1],
+                b.scale[2])
+    v = round(trans[transChannels.index(transChannel)], 3)
+    setActionsProps(actName, "update", channelMap, mapProp, mapPropValue = v)         
                 
                 
                 
